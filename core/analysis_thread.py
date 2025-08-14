@@ -77,6 +77,50 @@ class AnalysisThread(QThread):
             summary = local_vars.get('summary', '分析完成但未生成总结')
             chart_info = local_vars.get('chart_info', None)
 
+            # 新增：校验chart_info结构
+            if chart_info is not None and isinstance(chart_info, dict):
+                # 检查顶级字段
+                required_top = ["chart_type", "title", "data_prep"]
+                missing_top = [f for f in required_top if f not in chart_info]
+                if missing_top:
+                    summary += f"\n警告：图表配置缺少顶级字段 {missing_top}，已自动禁用图表"
+                    chart_info = None
+                else:
+                    # 检查data_prep字段
+                    data_prep = chart_info.get("data_prep", {})
+                    chart_type = chart_info.get("chart_type")
+                    required_data = []
+
+                    # 根据图表类型检查必要数据列
+                    if chart_type in ["bar", "line", "scatter"]:
+                        required_data = ["x_col", "y_col"]
+                    elif chart_type == "pie":
+                        required_data = ["x_col", "values"]
+                    elif chart_type == "hist":
+                        required_data = ["x_col"]
+
+                    missing_data = [f for f in required_data if f not in data_prep]
+                    if missing_data:
+                        summary += f"\n警告：图表{chart_type}缺少必要数据列 {missing_data}，已自动禁用图表"
+                        chart_info = None
+                    else:
+                        # 检查列名是否存在于result_table
+                        if result_table is not None:
+                            all_cols = result_table.columns.tolist()
+                            invalid_cols = [f for f in data_prep.values()
+                                            if f is not None and f not in all_cols]
+                            if invalid_cols:
+                                summary += f"\n警告：图表配置中的列 {invalid_cols} 不存在于结果表中，已自动禁用图表"
+                                chart_info = None
+                        else:
+                            chart_info = None
+
+            return {
+                "result_table": result_table,
+                "summary": summary,
+                "chart_info": chart_info
+            }
+
             # 确保result_table始终存在
             if result_table is None:
                 # 如果没有生成表格，默认合并所有数据
