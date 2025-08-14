@@ -3,24 +3,17 @@ from PyQt5.QtCore import Qt
 import matplotlib
 
 matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # 添加导入
 import pandas as pd
 import numpy as np
-
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-
-# 更新字体配置：使用系统更可能存在的中文字体
-matplotlib.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC", "Microsoft YaHei", "sans-serif"]
-matplotlib.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
-matplotlib.use('Qt5Agg')
-
-
 
 
 class ChartsWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.configure_matplotlib_fonts()
         self.init_ui()
         self.current_chart = None
 
@@ -34,6 +27,19 @@ class ChartsWidget(QWidget):
         self.layout.addWidget(self.canvas)
 
         self.clear_chart()
+
+    def configure_matplotlib_fonts(self):
+        """配置Matplotlib支持中文显示"""
+        # 设置字体列表，增加更多备选字体提高兼容性
+        plt.rcParams["font.family"] = [
+            "SimHei",         # 通用黑体
+            "WenQuanYi Micro Hei",
+            "Heiti TC",       # macOS黑体
+            "Microsoft YaHei",# Windows雅黑
+            "Arial Unicode MS"# 跨平台备选
+        ]
+        # 解决负号显示问题
+        plt.rcParams["axes.unicode_minus"] = False
 
     def clear_chart(self):
         """清除当前图表"""

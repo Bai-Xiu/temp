@@ -7,8 +7,12 @@ import pandas as pd
 from utils.helpers import show_info_message, show_error_message, get_unique_filename
 from ui.charts_widget import ChartsWidget  # 导入图表组件
 from utils.plot_helpers import prepare_chart_data  # 导入数据处理函数（修改了导入路径）
+from PyQt5.QtCore import pyqtSignal, QObject
+
 
 class ResultsTab(QWidget):
+    plot_chart_signal = pyqtSignal(dict, str, str, str, str)
+
     def __init__(self, config, parent=None):
         super().__init__(parent)
         self.config = config
@@ -16,6 +20,7 @@ class ResultsTab(QWidget):
         self.current_result = None
         self.current_save_dir = config.get("save_dir")
         self.init_ui()
+        self.plot_chart_signal.connect(self._plot_chart_main_thread)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -113,32 +118,35 @@ class ResultsTab(QWidget):
         layout.addLayout(btn_layout)
 
     def set_result(self, result):
-        """更新结果展示，确保图表绘制在主线程"""
+        """更新结果展示，通过信号触发主线程绘制图表"""
         self.current_result = result
         self.display_results(result)
 
-        # 检查图表数据并绘制（主线程中执行）
+        # 检查是否有图表信息
         if ("chart_info" in result and result["chart_info"] is not None and
                 "result_table" in result and isinstance(result["result_table"], pd.DataFrame)):
 
             self.chart_btn.setEnabled(True)
-            # 准备图表数据
             chart_data = prepare_chart_data(
                 result["result_table"],
                 result["chart_info"]["data_prep"]
             )
 
             if chart_data:
-                # 确保在主线程绘制图表
-                self.chart_widget.plot_chart(
+                # 发送信号到主线程绘制，而非直接调用
+                self.plot_chart_signal.emit(
                     chart_data,
                     result["chart_info"]["chart_type"],
                     result["chart_info"]["title"],
-                    x_label=result["chart_info"]["data_prep"].get("x_col"),
-                    y_label=result["chart_info"]["data_prep"].get("y_col")
+                    result["chart_info"]["data_prep"].get("x_col"),
+                    result["chart_info"]["data_prep"].get("y_col")
                 )
         else:
             self.chart_btn.setEnabled(False)
+
+    def _plot_chart_main_thread(self, data, chart_type, title, x_label, y_label):
+        """主线程中实际执行图表绘制"""
+        self.chart_widget.plot_chart(data, chart_type, title, x_label, y_label)
 
     def display_results(self, result):
         """显示结果表格"""

@@ -43,13 +43,13 @@ class AnalysisThread(QThread):
         cleaned = re.sub(r'```$', '', cleaned, flags=re.MULTILINE)
         return cleaned.strip()
 
-    def execute_cleaned_code(self, cleaned_code):  # 修复方法名
+    def execute_cleaned_code(self, cleaned_code):
         """执行完整代码（无包装函数）"""
         # 准备数据字典
         data_dict = self.processor.load_data_files(self.file_paths)
 
-        # 构建完整执行代码（修复缩进问题）
-        full_code = f"{cleaned_code}\n"  # 不添加额外缩进
+        # 构建完整执行代码
+        full_code = f"{cleaned_code}\n"
 
         # 执行代码
         local_vars = {
@@ -60,15 +60,18 @@ class AnalysisThread(QThread):
         try:
             exec(full_code, globals(), local_vars)
 
-            # 提取结果
+            # 提取结果（增加chart_info提取）
             result_table = local_vars.get('result_table')
             summary = local_vars.get('summary', '分析完成但未生成总结')
+            chart_info = local_vars.get('chart_info')  # 新增提取chart_info
 
-            if isinstance(summary, str):
-                test = summary % {}
-
-            return {"result_table": result_table, "summary": summary}
+            return {
+                "result_table": result_table,
+                "summary": summary,
+                "chart_info": chart_info  # 新增返回chart_info
+            }
         except Exception as e:
             return {
-                "summary": f"代码执行错误: {str(e)}\n\n执行的代码:\n{full_code}"
+                "summary": f"代码执行错误: {str(e)}\n\n执行的代码:\n{full_code}",
+                "chart_info": None  # 错误时也返回chart_info键
             }
