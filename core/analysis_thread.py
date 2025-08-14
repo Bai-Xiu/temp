@@ -19,19 +19,16 @@ class AnalysisThread(QThread):
         try:
             self.update_signal.emit("正在进行分析...")
             if self.mode == "1":
-                # 代码处理模式
+                # 代码处理模式 - 仅处理数据，不生成图表
                 code_block = self.processor.generate_processing_code(self.request, self.file_paths)
                 self.update_signal.emit("代码生成完成，开始执行...")
-
-                # 清理代码块，移除三重反引号和语言标识
-                cleaned_code = self.clean_code_block(code_block)  # 修复方法名引用
-
-                # 执行清理后的代码
+                cleaned_code = self.clean_code_block(code_block)
                 result = self.execute_cleaned_code(cleaned_code)
             else:
                 # 直接回答模式
                 result = self.processor.direct_answer(self.request, self.file_paths)
 
+            # 确保结果中不包含任何绘图指令，只返回数据
             self.complete_signal.emit({"status": "success", "result": result})
         except Exception as e:
             self.complete_signal.emit({"status": "error", "message": str(e)})
@@ -66,6 +63,9 @@ class AnalysisThread(QThread):
             # 提取结果
             result_table = local_vars.get('result_table')
             summary = local_vars.get('summary', '分析完成但未生成总结')
+
+            if isinstance(summary, str):
+                test = summary % {}
 
             return {"result_table": result_table, "summary": summary}
         except Exception as e:

@@ -3,11 +3,19 @@ from PyQt5.QtCore import Qt
 import matplotlib
 
 matplotlib.use('Qt5Agg')
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+# 更新字体配置：使用系统更可能存在的中文字体
+matplotlib.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC", "Microsoft YaHei", "sans-serif"]
+matplotlib.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
+matplotlib.use('Qt5Agg')
+
+
 
 
 class ChartsWidget(QWidget):

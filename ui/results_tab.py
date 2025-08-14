@@ -113,25 +113,23 @@ class ResultsTab(QWidget):
         layout.addLayout(btn_layout)
 
     def set_result(self, result):
-        """更新结果展示，同时准备图表数据"""
+        """更新结果展示，确保图表绘制在主线程"""
         self.current_result = result
         self.display_results(result)
 
-        # 检查是否有图表信息，如果有则准备图表数据
+        # 检查图表数据并绘制（主线程中执行）
         if ("chart_info" in result and result["chart_info"] is not None and
                 "result_table" in result and isinstance(result["result_table"], pd.DataFrame)):
 
-            # 启用图表按钮
             self.chart_btn.setEnabled(True)
-
             # 准备图表数据
             chart_data = prepare_chart_data(
                 result["result_table"],
                 result["chart_info"]["data_prep"]
             )
 
-            # 如果图表数据有效，绘制图表
             if chart_data:
+                # 确保在主线程绘制图表
                 self.chart_widget.plot_chart(
                     chart_data,
                     result["chart_info"]["chart_type"],
@@ -140,7 +138,6 @@ class ResultsTab(QWidget):
                     y_label=result["chart_info"]["data_prep"].get("y_col")
                 )
         else:
-            # 禁用图表按钮
             self.chart_btn.setEnabled(False)
 
     def display_results(self, result):
@@ -233,6 +230,8 @@ class ResultsTab(QWidget):
         self.result_table.setRowCount(0)
         self.result_table.setColumnCount(0)
         self.save_btn.setEnabled(False)
+        self.chart_btn.setEnabled(False)
+        self.show_table()
 
         # 切换到分析要求页（数据分析标签页，索引为2）
         if self.parent and hasattr(self.parent, 'tabs'):

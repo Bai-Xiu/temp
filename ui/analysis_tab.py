@@ -28,9 +28,11 @@ class AnalysisTab(QWidget):
         # 处理模式选择
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(QLabel("处理模式:"))
-
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(["代码处理(生成表格)", "直接回答"])
+        mode_layout.addWidget(self.mode_combo)
+        mode_layout.addStretch()
+        self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
         mode_layout.addWidget(self.mode_combo)
         mode_layout.addStretch()
 
@@ -100,6 +102,15 @@ class AnalysisTab(QWidget):
         """更新状态信息"""
         if self.parent and hasattr(self.parent, 'statusBar'):
             self.parent.statusBar().showMessage(message)
+
+    def on_mode_changed(self, index):
+        """模式切换时更新图表按钮状态"""
+        is_direct_mode = (index == 1)  # 直接回答模式索引为1
+        if self.parent and hasattr(self.parent, 'results_tab'):
+            # 禁用图表按钮
+            self.parent.results_tab.chart_btn.setEnabled(not is_direct_mode)
+            # 强制显示表格视图
+            self.parent.results_tab.show_table()
 
     def analysis_complete(self, result):
         """分析完成处理"""
