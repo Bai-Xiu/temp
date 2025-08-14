@@ -118,30 +118,41 @@ class ResultsTab(QWidget):
         layout.addLayout(btn_layout)
 
     def set_result(self, result):
-        """更新结果展示，通过信号触发主线程绘制图表"""
+        """更新结果展示，同时准备图表数据"""
         self.current_result = result
         self.display_results(result)
 
-        # 检查是否有图表信息
-        if ("chart_info" in result and result["chart_info"] is not None and
-                "result_table" in result and isinstance(result["result_table"], pd.DataFrame)):
+        # 检查是否有图表信息，如果有则准备图表数据
+        try:
+            if ("chart_info" in result and result["chart_info"] is not None and
+                    isinstance(result["chart_info"], dict) and
+                    "result_table" in result and isinstance(result["result_table"], pd.DataFrame)):
 
-            self.chart_btn.setEnabled(True)
-            chart_data = prepare_chart_data(
-                result["result_table"],
-                result["chart_info"]["data_prep"]
-            )
+                # 启用图表按钮
+                self.chart_btn.setEnabled(True)
 
-            if chart_data:
-                # 发送信号到主线程绘制，而非直接调用
-                self.plot_chart_signal.emit(
-                    chart_data,
-                    result["chart_info"]["chart_type"],
-                    result["chart_info"]["title"],
-                    result["chart_info"]["data_prep"].get("x_col"),
-                    result["chart_info"]["data_prep"].get("y_col")
+                # 准备图表数据
+                chart_data = prepare_chart_data(
+                    result["result_table"],
+                    result["chart_info"]["data_prep"]
                 )
-        else:
+
+                # 如果图表数据有效，绘制图表
+                if chart_data:
+                    self.chart_widget.plot_chart(
+                        chart_data,
+                        result["chart_info"]["chart_type"],
+                        result["chart_info"]["title"],
+                        x_label=result["chart_info"]["data_prep"].get("x_col"),
+                        y_label=result["chart_info"]["data_prep"].get("y_col")
+                    )
+                else:
+                    self.chart_btn.setEnabled(False)
+            else:
+                # 禁用图表按钮
+                self.chart_btn.setEnabled(False)
+        except Exception as e:
+            show_error_message(self, "图表处理错误", f"处理图表数据时出错: {str(e)}")
             self.chart_btn.setEnabled(False)
 
     def _plot_chart_main_thread(self, data, chart_type, title, x_label, y_label):
@@ -213,19 +224,33 @@ class ResultsTab(QWidget):
             self.save_dir_edit.setText(self.current_save_dir)  # 恢复当前目录
 
     def save_results(self):
-        if not self.current_result or "result_table" not in self.current_result:
+        if not self.current_result:
             show_error_message(self, "错误", "没有可保存的结果")
             return
 
         try:
-            df = self.current_result["result_table"]
-            base_name = "analysis_result"
-            # 使用当前保存目录作为保存路径
-            filename = get_unique_filename(self.current_save_dir, base_name, "csv")
-            file_path = os.path.join(self.current_save_dir, filename)
+            # 检查当前视图模式
+            if self.table_btn.isChecked() and "result_table" in self.current_result and self.current_result[
+                "result_table"] is not None:
+                # 表格视图 - 保存表格
+                df = self.current_result["result_table"]
+                base_name = "analysis_result"
+                filename = get_unique_filename(self.current_save_dir, base_name, "csv")
+                file_path = os.path.join(self.current_save_dir, filename)
+                df.to_csv(file_path, index=False, encoding="utf-8-sig")
+                show_info_message(self, "成功", f"表格已保存至:\n{file_path}")
 
-            df.to_csv(file_path, index=False, encoding="utf-8-sig")
-            show_info_message(self, "成功", f"结果已保存至:\n{file_path}")
+            elif self.chart_btn.isChecked() and self.chart_widget.current_chart is not None:
+                # 图表视图 - 保存图表
+                base_name = "analysis_chart"
+                filename = get_unique_filename(self.current_save_dir, base_name, "png")
+                file_path = os.path.join(self.current_save_dir, filename)
+                self.chart_widget.figure.savefig(file_path, dpi=300, bbox_inches='tight')
+                show_info_message(self, "成功", f"图表已保存至:\n{file_path}")
+
+            else:
+                show_error_message(self, "错误", "没有可保存的有效内容")
+
         except Exception as e:
             show_error_message(self, "保存失败", f"无法保存结果: {str(e)}")
 

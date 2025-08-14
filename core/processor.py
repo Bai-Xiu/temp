@@ -188,7 +188,8 @@ class LogAIProcessor:
             # 默认代码：直接返回所有数据
             return """import pandas as pd
     result_table = pd.concat(data_dict.values(), ignore_index=True)
-    summary = f'共{len(result_table)}条记录'"""
+    summary = f'共{len(result_table)}条记录'
+    chart_info = None"""
 
         data_dict = self._load_file_data(file_names)
 
@@ -206,51 +207,43 @@ class LogAIProcessor:
 
 说明：
 重要提示：返回的内容只能是可直接执行的代码，绝对不要有任何其他说明，保证返回的内容可以直接执行
-0. 使用变量或函数时先进行定义，确保代码可以直接执行
+0. 严格保证代码语法与库方法使用正确性：
+   - 所有Pandas方法（如groupby、reset_index、rename等）必须使用其支持的参数
+   - 特别注意：reset_index()方法不支持'name'参数，如需重命名列请使用rename()或在groupby时指定
+   - 方法参数名称必须准确无误，禁止使用不存在的参数
+   - 检查方法调用的参数数量与类型是否匹配
+   - 使用变量或函数时先进行定义，确保代码可以直接执行
 1. 已存在变量data_dict（文件名到DataFrame的字典），可直接使用
-2. 必须导入所需的库（如pandas）
-3. 必须定义两个变量：
+2. 必须导入所需的库（如pandas、datetime）
+3. 必须定义三个变量：
    - result_table：处理后的DataFrame结果（必须存在）
-   - summary：字符串类型的总结，根据用户要求，可以包含：
-     * 关键分析结论（如统计数量、趋势、异常点等）
-     * 数据中发现的规律总结
-     * 针对问题的解决方案或建议
-     * 其他用户要求但无法被作为代码执行的信息
-     禁止使用默认值，必须根据分析结果生成具体内容
-4. 不要包含任何函数定义，直接编写可执行代码
-5. 不需要return语句，只需确保定义了上述两个变量
-6. 处理日志时，务必将包含类似"低/中/高"等含中文的字符串的列显式转换为字符串类型（如df['level'] = df['level'].astype(str)）
-7. 对于时间/日期类型的列（如包含timestamp、datetime的列），必须显式转换为字符串类型（如df['time'] = df['time'].astype(str)），确保导出格式正确
-8. 处理日志时，对于确定同义的表头信息，建议使用统一的名称，并对内容进行整合
-
-# 图表生成规范（仅当用户要求生成图表（包括柱状图、折线图、饼图、散点图、直方图等）时添加）
-如果用户要求绘制图表（包括柱状图、折线图、饼图、散点图、直方图等），必须额外定义一个chart_info字典，包含：
-- chart_type：图表类型（支持bar/line/pie/scatter/hist）
-- title：图表标题（简洁描述图表内容）
-- data_prep：字典，包含图表数据准备参数：
-  - x_col：x轴数据列名（必须，对应result_table中的列）
-  - y_col：y轴数据列名（可选，bar/line/scatter需提供）
-  - bins：分箱数（仅hist类型需提供，默认10）
-  - group_col：分组列名（可选，如需按分组绘图）
-
-chart_info示例：
-chart_info = {{
-    "chart_type": "bar",
-    "title": "各类型攻击次数统计",
-    "data_prep": {{
-        "x_col": "attack_type",
-        "y_col": "count"
-    }}
-}}
-
-注意：chart_info必须基于result_table的数据结构定义，确保x_col/y_col等列名存在于result_table中。
+   - summary：字符串类型的总结，根据用户要求生成具体内容
+   - chart_info：图表信息字典（** 必须包含chart_type字段 **），格式为:
+     {{
+       "chart_type": "bar/line/pie/scatter/hist",  # 强制必填，且为支持的类型
+       "title": "图表标题",  # 强制必填
+       "data_prep": {{
+         "x_col": "x轴数据列名",  # bar/line/scatter/hist必须提供
+         "y_col": "y轴数据列名",  # bar/line/scatter可选
+         "values": "值列名",  # pie必须提供
+         "bins": 分箱数  # hist可选
+       }}
+     }}
+     若不需要图表，chart_info必须显式设置为None；若需要图表，所有标注"必须"的字段均为必填项
+4. 处理时间/日期类型列（如包含timestamp、datetime的列）：
+   - 必须显式转换为字符串类型（如df['time'] = df['time'].astype(str)或df['time'] = df['time'].dt.strftime('%Y-%m-%d %H:%M:%S')）
+   - 确保无任何Timestamp类型数据残留，避免JSON序列化错误
+5. 处理含中文的列（如"低/中/高"）：显式转换为字符串类型（df['level'] = df['level'].astype(str)）
+6. 不要包含任何函数定义，直接编写可执行代码
+7. 不需要return语句，只需确保定义了上述变量
+8. 对同义表头进行统一命名和内容整合
 """
 
         response = self.client.completions_create(
             model='deepseek-reasoner',
             prompt=prompt,
-            max_tokens=5000,
-            temperature=0.3
+            max_tokens=8000,
+            temperature=0.4
         )
 
         code_block = response.choices[0].message.content.strip()

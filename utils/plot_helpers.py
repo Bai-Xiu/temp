@@ -3,21 +3,7 @@ import numpy as np
 
 
 def prepare_chart_data(df, chart_info):
-    """
-    转换DataFrame数据为图表所需格式
-
-    参数:
-        df: 输入的DataFrame
-        chart_info: 包含图表配置的字典，应包含:
-            - chart_type: 图表类型
-            - x_col: x轴数据列名
-            - y_col: y轴数据列名 (可选)
-            - group_col: 分组列名 (可选)
-            - bins: 直方图的分箱数 (可选，仅用于hist类型)
-
-    返回:
-        适合图表绘制的数据字典，或None如果处理失败
-    """
+    """转换DataFrame数据为图表所需格式"""
     try:
         # 数据有效性校验
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:

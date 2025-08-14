@@ -13,7 +13,9 @@ import numpy as np
 class ChartsWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.configure_matplotlib_fonts()
+        # 配置Matplotlib支持中文显示
+        plt.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC", "Arial Unicode MS"]
+        plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
         self.init_ui()
         self.current_chart = None
 
