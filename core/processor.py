@@ -221,7 +221,30 @@ class LogAIProcessor:
 5. 不需要return语句，只需确保定义了上述两个变量
 6. 处理日志时，务必将包含类似"低/中/高"等含中文的字符串的列显式转换为字符串类型（如df['level'] = df['level'].astype(str)）
 7. 对于时间/日期类型的列（如包含timestamp、datetime的列），必须显式转换为字符串类型（如df['time'] = df['time'].astype(str)），确保导出格式正确
-8. 处理日志时，对于确定同义的表头信息，建议使用统一的名称，并对内容进行整合"""
+8. 处理日志时，对于确定同义的表头信息，建议使用统一的名称，并对内容进行整合
+
+# 图表生成规范（仅当用户需求适合可视化时添加）
+如果用户需求涉及数据对比、分布、趋势等适合图表展示的场景，必须额外定义一个chart_info字典，包含：
+- chart_type：图表类型（支持bar/line/pie/scatter/hist）
+- title：图表标题（简洁描述图表内容）
+- data_prep：字典，包含图表数据准备参数：
+  - x_col：x轴数据列名（必须，对应result_table中的列）
+  - y_col：y轴数据列名（可选，bar/line/scatter需提供）
+  - bins：分箱数（仅hist类型需提供，默认10）
+  - group_col：分组列名（可选，如需按分组绘图）
+
+chart_info示例：
+chart_info = {{
+    "chart_type": "bar",
+    "title": "各类型攻击次数统计",
+    "data_prep": {{
+        "x_col": "attack_type",
+        "y_col": "count"
+    }}
+}}
+
+注意：chart_info必须基于result_table的数据结构定义，确保x_col/y_col等列名存在于result_table中。
+"""
 
         response = self.client.completions_create(
             model='deepseek-reasoner',
@@ -287,3 +310,4 @@ class LogAIProcessor:
 
 
         return {"summary": response.choices[0].message.content.strip()}
+
