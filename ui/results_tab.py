@@ -132,19 +132,20 @@ class ResultsTab(QWidget):
                 self.chart_btn.setEnabled(True)
 
                 # 准备图表数据
+                # 修改为：传递完整的 chart_info 字典
                 chart_data = prepare_chart_data(
                     result["result_table"],
-                    result["chart_info"]["data_prep"]
+                    result["chart_info"]
                 )
 
                 # 如果图表数据有效，绘制图表
                 if chart_data:
                     self.chart_widget.plot_chart(
                         chart_data,
-                        result["chart_info"]["chart_type"],
+                        result["chart_info"]["chart_type"],  # 直接从顶级获取
                         result["chart_info"]["title"],
-                        x_label=result["chart_info"]["data_prep"].get("x_col"),
-                        y_label=result["chart_info"]["data_prep"].get("y_col")
+                        x_label=result["chart_info"].get("x_col"),  # 直接从顶级获取
+                        y_label=result["chart_info"].get("y_col")
                     )
                 else:
                     self.chart_btn.setEnabled(False)

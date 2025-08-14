@@ -187,8 +187,12 @@ class LogAIProcessor:
         if not self.client:
             # 默认代码：直接返回所有数据
             return """import pandas as pd
-    result_table = pd.concat(data_dict.values(), ignore_index=True)
-    summary = f'共{len(result_table)}条记录'
+result_table = pd.concat(data_dict.values(), ignore_index=True)
+# 转换所有时间类型列
+for col in result_table.columns:
+    if pd.api.types.is_datetime64_any_dtype(result_table[col]):
+        result_table[col] = result_table[col].astype(str)
+summary = f'共{len(result_table)}条记录
     chart_info = None"""
 
         data_dict = self._load_file_data(file_names)
@@ -209,6 +213,12 @@ class LogAIProcessor:
 重要提示：返回的内容只能是可直接执行的代码，绝对不要有任何其他说明，保证返回的内容可以直接执行
 0. 严格保证代码语法与库方法使用正确性：
    - 所有Pandas方法（如groupby、reset_index、rename等）必须使用其支持的参数
+   - 在处理 pandas 数据框时，请注意：
+     1. 计算最大值/最小值位置时，`idxmax()`/`idxmin()` 返回的是行索引（整数），而非行数据本身
+     2. 正确步骤应为：先通过 idxmax() 获取索引 → 再用 loc[索引] 获取行数据
+     3. 禁止直接使用 `df.loc[df['列名'].idxmax()]` 的结果作为新的索引值
+     4. 数值列（如计数、数量）应保持整数/浮点类型，避免转为字符串导致计算错误
+     5. 生成总结文字时，需先获取完整行数据，再提取其中的字段值（如时段和次数）
    - 特别注意：reset_index()方法不支持'name'参数，如需重命名列请使用rename()或在groupby时指定
    - 方法参数名称必须准确无误，禁止使用不存在的参数
    - 检查方法调用的参数数量与类型是否匹配
@@ -229,6 +239,8 @@ class LogAIProcessor:
          "bins": 分箱数  # hist可选
        }}
      }}
+     这是图表信息的模板，chart_type字段按照这些关键词对应：bar柱状图/line折线图/scatter散点图/hist直方图/pie饼图
+     当用户说生成“图表”这类泛指时，由你决定图表类型（即chart_type字段）
      若不需要图表，chart_info必须显式设置为None；若需要图表，所有标注"必须"的字段均为必填项
 4. 处理时间/日期类型列（如包含timestamp、datetime的列）：
    - 必须显式转换为字符串类型（如df['time'] = df['time'].astype(str)或df['time'] = df['time'].dt.strftime('%Y-%m-%d %H:%M:%S')）
@@ -237,6 +249,10 @@ class LogAIProcessor:
 6. 不要包含任何函数定义，直接编写可执行代码
 7. 不需要return语句，只需确保定义了上述变量
 8. 对同义表头进行统一命名和内容整合
+特别注意：
+进行列重命名时，确保新列名的数量与 DataFrame 实际列数完全一致
+若需重置索引，优先使用 drop=True 参数（如 reset_index (drop=True)）避免引入多余的索引列
+操作完成后建议通过检查列结构，确保列数和列名符合预期
 """
 
         response = self.client.completions_create(
