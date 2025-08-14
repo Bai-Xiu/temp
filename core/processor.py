@@ -209,8 +209,12 @@ summary = f'共{len(result_table)}条记录
 用户需求: {user_request}
 数据信息: {json.dumps(file_info, ensure_ascii=False)}
 
+重要提示：
+1. 返回的内容只能是可直接执行的代码
+2. 不要有任何对代码的说明或者其他说明
+3. 保证返回的内容可以直接执行
+4. 不能作为代码执行的内容放在summary字符串中
 说明：
-重要提示：返回的内容只能是可直接执行的代码，绝对不要有任何其他说明，保证返回的内容可以直接执行
 0. 严格保证代码语法与库方法使用正确性：
    - 所有Pandas方法（如groupby、reset_index、rename等）必须使用官方支持的参数，禁止使用不存在的参数（如reset_index的'name'参数）
    - 处理DataFrame时：

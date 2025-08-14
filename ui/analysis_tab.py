@@ -29,12 +29,10 @@ class AnalysisTab(QWidget):
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(QLabel("处理模式:"))
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["代码处理(生成表格)", "直接回答"])
+        self.mode_combo.addItems(["代码处理", "直接回答"])
         mode_layout.addWidget(self.mode_combo)
         mode_layout.addStretch()
         self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
-        mode_layout.addWidget(self.mode_combo)
-        mode_layout.addStretch()
 
         # 进度条
         self.progress = QProgressBar()
