@@ -212,7 +212,8 @@ summary = f'共{len(result_table)}条记录
 说明：
 重要提示：返回的内容只能是可直接执行的代码，绝对不要有任何其他说明，保证返回的内容可以直接执行
 0. 严格保证代码语法与库方法使用正确性：
-   - 所有Pandas方法（如groupby、reset_index、rename等）必须使用其支持的参数
+   - 所有Pandas方法（如groupby、reset_index、rename等）必须使用官方支持的参数，禁止使用不存在的参数（如reset_index的'name'参数）
+   - 处理DataFrame时：
    - 在处理 pandas 数据框时，请注意：
      1. 计算最大值/最小值位置时，`idxmax()`/`idxmin()` 返回的是行索引（整数），而非行数据本身
      2. 正确步骤应为：先通过 idxmax() 获取索引 → 再用 loc[索引] 获取行数据
@@ -228,6 +229,11 @@ summary = f'共{len(result_table)}条记录
 3. 必须定义三个变量：
    - result_table：处理后的DataFrame结果（必须存在）
    - summary：字符串类型的总结，根据用户要求生成具体内容
+     * 关键分析结论（如统计数量、趋势、异常点等）
+     * 数据中发现的规律总结
+     * 针对问题的解决方案或建议
+     * 其他用户要求但无法被作为代码执行的信息
+     禁止使用默认值，必须根据分析结果生成具体内容
    - chart_info：图表信息字典（** 必须包含chart_type字段 **），格式为:
      {{
        "chart_type": "bar/line/pie/scatter/hist",  # 强制必填，且为支持的类型
@@ -242,6 +248,11 @@ summary = f'共{len(result_table)}条记录
      这是图表信息的模板，chart_type字段按照这些关键词对应：bar柱状图/line折线图/scatter散点图/hist直方图/pie饼图
      当用户说生成“图表”这类泛指时，由你决定图表类型（即chart_type字段）
      若不需要图表，chart_info必须显式设置为None；若需要图表，所有标注"必须"的字段均为必填项
+     在生成图表信息时，需严格遵循以下规范：
+     1. **列名验证前置**：生成`chart_info`前，必须先获取`result_table`的所有列名（通过`result_table.columns.tolist()`），并确认所有指定的列（如`x_col`、`y_col`、`values`）均在列名列表中，禁止使用数据中不存在的列名。
+     2. **动态适配列名**：若用户需求中提到的列名（如“次数”）与`result_table`实际列名不一致，需使用实际列名，并在`summary`中说明列名对应关系（例如：“注：图表中使用的‘count’列对应需求中的‘次数’”）。
+     3. **错误规避处理**：若用户需求中的列名不存在且无替代列，应放弃生成该图表，将`chart_info`设为`None`，并在`summary`中说明原因（例如：“因数据中无‘次数’列，无法生成对应图表”）。
+     4. **显式列名引用**：在`chart_info`的`data_prep`中，所有列名必须直接引用`result_table`中存在的列，禁止使用任何推测性列名或别名。
 4. 处理时间/日期类型列（如包含timestamp、datetime的列）：
    - 必须显式转换为字符串类型（如df['time'] = df['time'].astype(str)或df['time'] = df['time'].dt.strftime('%Y-%m-%d %H:%M:%S')）
    - 确保无任何Timestamp类型数据残留，避免JSON序列化错误
@@ -258,8 +269,8 @@ summary = f'共{len(result_table)}条记录
         response = self.client.completions_create(
             model='deepseek-reasoner',
             prompt=prompt,
-            max_tokens=8000,
-            temperature=0.4
+            max_tokens=5000,
+            temperature=0.3
         )
 
         code_block = response.choices[0].message.content.strip()
