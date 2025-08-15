@@ -214,8 +214,12 @@ summary = f'共{len(result_table)}条记录
 2. 不要有任何对代码的说明或者其他说明
 3. 保证返回的内容可以直接执行
 4. 不能作为代码执行的内容放在summary字符串中
+5. 代码中使用变量或函数时先进行定义，确保代码可以直接执行
+6. 生成图表时确保列明存在于数据中
 说明：
 0. 严格保证代码语法与库方法使用正确性：
+   - 所有括号（包括圆括号、方括号、花括号）必须严格匹配，确保每个左括号都有对应的右括号，且嵌套关系正确
+   - 检查所有语句的语法完整性，避免出现未闭合的括号、引号等情况
    - 所有Pandas方法（如groupby、reset_index、rename等）必须使用官方支持的参数，禁止使用不存在的参数（如reset_index的'name'参数）
    - 处理DataFrame时：
    - 在处理 pandas 数据框时，请注意：
@@ -227,7 +231,6 @@ summary = f'共{len(result_table)}条记录
    - 特别注意：reset_index()方法不支持'name'参数，如需重命名列请使用rename()或在groupby时指定
    - 方法参数名称必须准确无误，禁止使用不存在的参数
    - 检查方法调用的参数数量与类型是否匹配
-   - 使用变量或函数时先进行定义，确保代码可以直接执行
 1. 已存在变量data_dict（文件名到DataFrame的字典），可直接使用
 2. 必须导入所需的库（如pandas、datetime）
 3. 必须定义三个变量：
@@ -261,12 +264,9 @@ summary = f'共{len(result_table)}条记录
    - 必须显式转换为字符串类型（如df['time'] = df['time'].astype(str)或df['time'] = df['time'].dt.strftime('%Y-%m-%d %H:%M:%S')）
    - 确保无任何Timestamp类型数据残留，避免JSON序列化错误
 5. 处理含中文的列（如"低/中/高"）：显式转换为字符串类型（df['level'] = df['level'].astype(str)）
-6. 不要包含任何函数定义，直接编写可执行代码
-7. 不需要return语句，只需确保定义了上述变量
-8. 对同义表头进行统一命名和内容整合
-9. 进行列重命名时，确保新列名的数量与 DataFrame 实际列数完全一致
-10. 若需重置索引，优先使用 drop=True 参数（如 reset_index (drop=True)）避免引入多余的索引列
-11. 操作完成后建议通过检查列结构，确保列数和列名符合预期
+6. 对同义表头进行统一命名和内容整合
+7. 进行列重命名时，确保新列名的数量与 DataFrame 实际列数完全一致
+8. 若需重置索引，优先使用 drop=True 参数（如 reset_index (drop=True)）避免引入多余的索引列
 """
 
         response = self.client.completions_create(

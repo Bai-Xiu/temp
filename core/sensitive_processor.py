@@ -212,59 +212,57 @@ class SensitiveWordProcessor:
             return False, f"导出失败: {str(e)}"
 
     def replace_sensitive_words(self, text):
-        """替换文本中的敏感词，包括抬头部分"""
+        """替换文本中的敏感词，优化为单次遍历"""
         if not text or not isinstance(text, str) or not self.sensitive_words:
             return text, {}
 
         replaced_text = text
         replace_count = {}
 
-        # 按长度降序处理，避免子串冲突（长词优先）
-        for word, replacement in self.sensitive_words.items():
-            try:
-                # 转义敏感词中的特殊字符
-                escaped_word = re.escape(word)
-                # 匹配所有位置的敏感词（包括开头和中间）
-                pattern = re.compile(f'{escaped_word}')
-                # 执行替换并计数
-                temp_text, count = pattern.subn(replacement, replaced_text)
+        # 1. 构建合并的正则模式（长词优先，已通过_sort_sensitive_words保证）
+        if self.sensitive_words:
+            # 转义所有敏感词并拼接为 "word1|word2|..."
+            escaped_words = [re.escape(word) for word in self.sensitive_words.keys()]
+            combined_pattern = re.compile('|'.join(escaped_words))
 
-                if count > 0:
-                    replace_count[word] = replace_count.get(word, 0) + count
-                    replaced_text = temp_text
+            # 2. 单次遍历替换，通过回调函数处理替换和计数
+            def replace_callback(match):
+                matched_word = match.group()
+                replacement = self.sensitive_words[matched_word]
+                # 更新计数
+                replace_count[matched_word] = replace_count.get(matched_word, 0) + 1
+                return replacement
 
-            except Exception as e:
-                print(f"替换敏感词'{word}'时出错: {str(e)}")
+            replaced_text = combined_pattern.sub(replace_callback, text)
 
         return replaced_text, replace_count
 
     def restore_sensitive_words(self, text):
-        """将文本中的替换词还原为原始敏感词"""
+        """将文本中的替换词还原为原始敏感词，优化为单次遍历"""
         if not text or not isinstance(text, str) or not self.replacement_map:
             return text
 
         restored_text = text
         replace_count = {}
 
-        # 按替换词长度降序处理，避免子串冲突
+        # 1. 构建替换词的合并正则模式（长替换词优先）
         sorted_replacements = sorted(
             self.replacement_map.items(),
             key=lambda x: len(x[0]),
             reverse=True
         )
+        if sorted_replacements:
+            escaped_replacements = [re.escape(rep) for rep, _ in sorted_replacements]
+            combined_pattern = re.compile('|'.join(escaped_replacements), re.IGNORECASE | re.MULTILINE)
 
-        for replacement, word in sorted_replacements:
-            try:
-                escaped_replacement = re.escape(replacement)
-                pattern = re.compile(escaped_replacement, re.IGNORECASE | re.MULTILINE)
+            # 2. 单次遍历还原
+            def restore_callback(match):
+                matched_rep = match.group()
+                original_word = self.replacement_map[matched_rep]
+                replace_count[matched_rep] = replace_count.get(matched_rep, 0) + 1
+                return original_word
 
-                # 计算还原次数
-                _, count = pattern.subn(word, restored_text)
-                if count > 0:
-                    replace_count[replacement] = count
-                    restored_text = pattern.sub(word, restored_text)
-            except Exception as e:
-                print(f"还原敏感词 {replacement} 失败: {str(e)}")
+            restored_text = combined_pattern.sub(restore_callback, text)
 
         return restored_text
 
