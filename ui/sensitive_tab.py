@@ -4,6 +4,8 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdi
 from PyQt5.QtCore import Qt
 import os
 from utils.helpers import show_info_message, show_error_message
+from PyQt5.QtWidgets import QDialog, QProgressBar, QVBoxLayout, QLabel
+from PyQt5.QtCore import Qt
 
 
 class SensitiveWordTab(QWidget):
@@ -213,3 +215,34 @@ class SensitiveWordTab(QWidget):
         if file_path:
             success, msg = self.sensitive_processor.export_to_file(file_path)
             show_info_message(self, "导出结果", msg)
+
+
+class ProgressDialog(QDialog):
+    def __init__(self, title, total_files, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setFixedSize(400, 100)
+        self.total = total_files
+        self.current = 0
+
+        layout = QVBoxLayout()
+
+        self.label = QLabel("准备处理...")
+        layout.addWidget(self.label)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, total_files)
+        layout.addWidget(self.progress_bar)
+
+        self.setLayout(layout)
+
+    def update_progress(self, filename):
+        self.current += 1
+        self.label.setText(f"正在处理: {filename}")
+        self.progress_bar.setValue(self.current)
+        # 处理UI事件，防止界面冻结
+        QApplication.processEvents()
+
+    def complete(self):
+        self.label.setText("处理完成!")
+        self.progress_bar.setValue(self.total)

@@ -20,9 +20,23 @@ class SensitiveWordProcessor:
         )
         self.supported_encodings = ['utf-8', 'gbk', 'gb2312']
 
+        self.compiled_patterns = {}  # 存储预编译的正则表达式
+        self._compile_patterns()
+
         # 确保文件存在并加载敏感词
         self._ensure_file_exists()
         self.load_sensitive_words()
+
+    def _compile_patterns(self):
+        """预编译所有敏感词的正则表达式，提高替换效率"""
+        self.compiled_patterns.clear()
+        for word, replacement in self.sensitive_words.items():
+            try:
+                escaped_word = re.escape(word)
+                pattern = re.compile(f'{escaped_word}')
+                self.compiled_patterns[word] = (pattern, replacement)
+            except Exception as e:
+                print(f"编译敏感词'{word}'正则表达式出错: {str(e)}")
 
     def _ensure_file_exists(self):
         """确保敏感词文件存在，不存在则创建"""
@@ -59,6 +73,7 @@ class SensitiveWordProcessor:
             # 去重并排序
             self.sensitive_words = {k: v for k, v in self.sensitive_words.items()}
             self._sort_sensitive_words()
+            self._compile_patterns()  # 加载后重新编译
             return True
         except Exception as e:
             return False
@@ -212,28 +227,25 @@ class SensitiveWordProcessor:
             return False, f"导出失败: {str(e)}"
 
     def replace_sensitive_words(self, text):
-        """替换文本中的敏感词，优化为单次遍历"""
+        """替换文本中的敏感词，包括抬头部分"""
         if not text or not isinstance(text, str) or not self.sensitive_words:
             return text, {}
 
         replaced_text = text
         replace_count = {}
 
-        # 1. 构建合并的正则模式（长词优先，已通过_sort_sensitive_words保证）
-        if self.sensitive_words:
-            # 转义所有敏感词并拼接为 "word1|word2|..."
-            escaped_words = [re.escape(word) for word in self.sensitive_words.keys()]
-            combined_pattern = re.compile('|'.join(escaped_words))
+        # 使用预编译的正则表达式
+        for word, (pattern, replacement) in self.compiled_patterns.items():
+            try:
+                # 执行替换并计数
+                temp_text, count = pattern.subn(replacement, replaced_text)
 
-            # 2. 单次遍历替换，通过回调函数处理替换和计数
-            def replace_callback(match):
-                matched_word = match.group()
-                replacement = self.sensitive_words[matched_word]
-                # 更新计数
-                replace_count[matched_word] = replace_count.get(matched_word, 0) + 1
-                return replacement
+                if count > 0:
+                    replace_count[word] = replace_count.get(word, 0) + count
+                    replaced_text = temp_text
 
-            replaced_text = combined_pattern.sub(replace_callback, text)
+            except Exception as e:
+                print(f"替换敏感词'{word}'时出错: {str(e)}")
 
         return replaced_text, replace_count
 

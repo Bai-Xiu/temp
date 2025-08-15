@@ -17,7 +17,12 @@ class AnalysisThread(QThread):
 
     def run(self):
         try:
-            self.update_signal.emit("正在进行分析...")
+            self.update_signal.emit("正在加载数据...")
+
+            # 提前加载数据，避免在代码执行阶段加载
+            data_dict = self.processor.load_data_files(self.file_paths)
+            self.update_signal.emit("数据加载完成，正在进行分析...")
+
             if self.mode == "1":
                 # 代码处理模式
                 code_block = self.processor.generate_processing_code(self.request, self.file_paths)
@@ -27,7 +32,7 @@ class AnalysisThread(QThread):
                 cleaned_code = self.clean_code_block(code_block)
 
                 # 执行清理后的代码
-                result = self.execute_cleaned_code(cleaned_code)
+                result = self.execute_cleaned_code(cleaned_code, data_dict)  # 传入预加载的数据
 
             else:
                 # 直接回答模式
@@ -45,9 +50,8 @@ class AnalysisThread(QThread):
         cleaned = re.sub(r'```$', '', cleaned, flags=re.MULTILINE)
         return cleaned.strip()
 
-    def execute_cleaned_code(self, cleaned_code):
-        """执行代码并简化图表配置校验"""
-        data_dict = self.processor.load_data_files(self.file_paths)
+    def execute_cleaned_code(self, cleaned_code, data_dict):
+        """执行代码并简化图表配置校验，使用预加载的数据"""
         full_code = f"{cleaned_code}\n"
         local_vars = {
             'data_dict': data_dict,

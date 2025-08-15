@@ -1,11 +1,13 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QListWidget, QGroupBox, QSplitter,
-                             QFileDialog, QListWidgetItem, QMessageBox)
-from PyQt5.QtCore import Qt
+                             QFileDialog, QListWidgetItem, QMessageBox, )
+from PyQt5.QtCore import (Qt, QTimer)
 from PyQt5.QtWidgets import QFileIconProvider
 import os
 import shutil
 from utils.helpers import get_file_list, show_info_message, show_error_message
+from ui.sensitive_tab import ProgressDialog  # 导入新类
+from PyQt5.QtCore import QThread, pyqtSignal
 
 
 class FileTab(QWidget):
@@ -259,19 +261,79 @@ class FileTab(QWidget):
         if not save_dir:
             return
 
-        try:
-            # 执行去敏处理
-            results = self.processor.process_and_anonymize_files(
-                self.selected_files,
-                save_dir
+        # 创建进度对话框
+        progress_dialog = ProgressDialog("正在进行去敏处理", len(self.selected_files), self)
+        progress_dialog.show()
+
+        # 创建并启动去敏线程
+        self.anonymize_thread = AnonymizeThread(
+            self.processor,
+            self.selected_files,
+            save_dir
+        )
+        self.anonymize_thread.update_signal.connect(progress_dialog.update_progress)
+        self.anonymize_thread.complete_signal.connect(lambda res: self.on_anonymize_complete(res, progress_dialog))
+        self.anonymize_thread.start()
+
+    # 确保这个方法在FileTab类内部
+    def on_anonymize_complete(self, result, progress_dialog):
+        """去敏完成后的处理"""
+        progress_dialog.complete()
+
+        if result["status"] == "success":
+            show_info_message(
+                self, "成功",
+                f"已完成{len(result['results'])}个文件的去敏处理"
             )
+            # 更新配置中的保存目录
+            if result['results']:
+                first_path = next(iter(result['results'].values()))
+                self.config.set("save_dir", os.path.dirname(first_path))
+        else:
+            show_error_message(self, "错误", result["message"])
 
-            # 显示结果
-            msg = "成功去敏并保存以下文件：\n"
-            for original, anonymized in results.items():
-                msg += f"- {original} → {os.path.basename(anonymized)}\n"
+        # 延迟关闭进度对话框
+        QTimer.singleShot(1000, progress_dialog.close)
 
-            show_info_message(self, "成功", msg)
+# 添加去敏处理线程
+class AnonymizeThread(QThread):
+    update_signal = pyqtSignal(str)
+    complete_signal = pyqtSignal(dict)
 
+    def __init__(self, processor, file_names, output_dir):
+        super().__init__()
+        self.processor = processor
+        self.file_names = file_names
+        self.output_dir = output_dir
+
+    def run(self):
+        try:
+            results = {}
+            for filename in self.file_names:
+                self.update_signal.emit(filename)
+                # 单文件处理逻辑（从process_and_anonymize_files拆分）
+                data_dict = self.processor._load_file_data([filename])
+                for fname, df in data_dict.items():
+                    anonymized_df = self.processor._anonymize_dataframe(df)
+                    base_name = os.path.splitext(fname)[0]
+                    ext = os.path.splitext(fname)[1]
+                    output_path = os.path.join(
+                        self.output_dir,
+                        f"{base_name}_anonymized{ext}"
+                    )
+
+                    # 保存文件
+                    if ext.lower() in ['.csv']:
+                        anonymized_df.to_csv(output_path, index=False, encoding='utf-8-sig')
+                    elif ext.lower() in ['.xlsx', '.xls']:
+                        anonymized_df.to_excel(output_path, index=False)
+                    elif ext.lower() in ['.json']:
+                        anonymized_df.to_json(output_path, orient='records', force_ascii=False)
+                    else:
+                        content = "\n".join(anonymized_df.iloc[:, 0].astype(str).tolist())
+                        with open(output_path, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                    results[fname] = output_path
+            self.complete_signal.emit({"status": "success", "results": results})
         except Exception as e:
-            show_error_message(self, "处理失败", f"去敏过程出错: {str(e)}")
+            self.complete_signal.emit({"status": "error", "message": str(e)})

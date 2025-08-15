@@ -82,39 +82,42 @@ class LogAIProcessor:
         return self._load_file_data(file_names)
 
     def _load_file_data(self, file_names):
-        """从当前数据目录读取文件数据"""
+        """从当前数据目录读取文件数据，使用多线程加载"""
         if self.current_data and set(file_names) == set(self.current_data.keys()):
             return self.current_data
 
         data_dict = {}
-        for file_name in file_names:
+        # 对于大量文件，使用线程池加速加载
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def load_single_file(file_name):
             safe_file = sanitize_filename(file_name)
             full_path = os.path.join(self.current_data_dir, safe_file)
 
             if not os.path.exists(full_path):
                 raise FileNotFoundError(f"文件不存在: {full_path}")
 
-            # 获取文件扩展名
             _, ext = os.path.splitext(full_path)
             ext = ext.lower()
 
-            # 检查是否支持该类型
             if ext not in self.extension_map:
                 supported_exts = ", ".join(self.extension_map.keys())
-                raise ValueError(
-                    f"不支持的文件格式: {ext}。支持的格式: {supported_exts}"
-                )
+                raise ValueError(f"不支持的文件格式: {ext}。支持的格式: {supported_exts}")
 
-            # 使用对应的处理器读取文件
-            try:
-                processor = self.extension_map[ext]
-                df = processor.read_file(
-                    full_path,
-                    encodings=self.supported_encodings
-                )
-                data_dict[safe_file] = df
-            except Exception as e:
-                raise RuntimeError(f"读取文件 {safe_file} 失败: {str(e)}")
+            processor = self.extension_map[ext]
+            df = processor.read_file(full_path, encodings=self.supported_encodings)
+            return safe_file, df
+
+        # 使用线程池并行加载文件
+        with ThreadPoolExecutor(max_workers=min(4, len(file_names))) as executor:
+            futures = {executor.submit(load_single_file, fn): fn for fn in file_names}
+
+            for future in as_completed(futures):
+                try:
+                    safe_file, df = future.result()
+                    data_dict[safe_file] = df
+                except Exception as e:
+                    raise RuntimeError(f"读取文件 {futures[future]} 失败: {str(e)}")
 
         self.current_data = data_dict
         return data_dict
@@ -160,15 +163,16 @@ class LogAIProcessor:
         return results
 
     def _anonymize_dataframe(self, df):
-        """对DataFrame进行去敏处理"""
+        """对DataFrame进行去敏处理，使用向量化操作"""
         df_copy = df.copy()
 
         # 对每一列进行处理
         for col in df_copy.columns:
-            # 处理字符串类型的列
+            # 处理字符串类型的列，使用向量化操作
             if df_copy[col].dtype == 'object':
-                df_copy[col] = df_copy[col].apply(
-                    lambda x: self._anonymize_text(str(x)) if pd.notna(x) else x
+                # 使用applymap代替apply提高性能
+                df_copy[col] = df_copy[col].astype(str).apply(
+                    lambda x: self._anonymize_text(x) if pd.notna(x) else x
                 )
 
         return df_copy
